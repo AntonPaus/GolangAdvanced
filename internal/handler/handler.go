@@ -6,55 +6,54 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/AntonPaus/GolangAdvanced/internal/repository"
+	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
+	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {
-	Storage repository.MetricsStorage
+	Storage interfaces.MetricsStorage
 }
 
 func (h *Handler) MainPage(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte("Nothing happens. It is main page."))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(strings.Join(h.Storage.GetAll(), "\n")))
+}
+
+func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
+	mType, mName := chi.URLParam(r, "type"), chi.URLParam(r, "name")
+	v, err := h.Storage.Get(mType, mName)
+	if err != nil {
+		http.Error(w, "error getting metric", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("%v", v)))
 }
 
 func (h *Handler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only Post requests are allowed!", http.StatusMethodNotAllowed)
-		return
-	}
+	mType, mName, mValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
 	if err := r.ParseForm(); err != nil {
 		w.Write([]byte(err.Error()))
 		return
 	}
-
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) != 4 {
-		http.Error(w, "wrong path", http.StatusNotFound)
-		return
-	}
-	metricType := parts[1]
-	metricName := parts[2]
-	metricValue := parts[3]
-
-	switch metricType {
-	case repository.MetricTypeGauge:
-		value, err := strconv.ParseFloat(metricValue, 64)
+	switch mType {
+	case interfaces.MetricTypeGauge:
+		value, err := strconv.ParseFloat(mValue, 64)
 		if err != nil {
 			http.Error(w, "invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		if err := h.Storage.Set(metricType, metricName, value); err != nil {
+		if err := h.Storage.Set(mType, mName, value); err != nil {
 			http.Error(w, "error setting gauge metric", http.StatusBadRequest)
 			return
 		}
-	case repository.MetricTypeCounter:
-		value, err := strconv.ParseInt(metricValue, 10, 64)
+	case interfaces.MetricTypeCounter:
+		value, err := strconv.ParseInt(mValue, 10, 64)
 		if err != nil {
 			http.Error(w, "invalid counter value", http.StatusBadRequest)
 			return
 		}
-		if err := h.Storage.Set(metricType, metricName, value); err != nil {
+		if err := h.Storage.Set(mType, mName, value); err != nil {
 			http.Error(w, "failed to save counter metric", http.StatusBadRequest)
 			return
 		}
@@ -62,11 +61,11 @@ func (h *Handler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "metric type not found", http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	v, err := h.Storage.Get(metricType, metricName)
+	v, err := h.Storage.Get(mType, mName)
 	if err != nil {
 		http.Error(w, "error getting metric", http.StatusBadRequest)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf("metric updated: %v\n", v)))
 }

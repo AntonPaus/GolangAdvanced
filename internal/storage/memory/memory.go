@@ -2,8 +2,9 @@ package memory
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/AntonPaus/GolangAdvanced/internal/repository"
+	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
 )
 
 type MemoryStorage struct {
@@ -11,23 +12,23 @@ type MemoryStorage struct {
 	metricsInt64   map[string]int64
 }
 
-func NewMemoryStorage() *MemoryStorage {
+func NewMemoryStorage() (*MemoryStorage, error) {
 	m := &MemoryStorage{
 		metricsFloat64: make(map[string]float64),
 		metricsInt64:   make(map[string]int64),
 	}
-	return m
+	return m, nil
 }
 
 func (m *MemoryStorage) Set(mType string, mKey string, mValue any) error {
 	switch mType {
-	case repository.MetricTypeGauge:
+	case interfaces.MetricTypeGauge:
 		g, ok := mValue.(float64)
 		if !ok {
 			return errors.New("invalid metric value, it is not gauge")
 		}
 		m.metricsFloat64[mKey] = g
-	case repository.MetricTypeCounter:
+	case interfaces.MetricTypeCounter:
 		c, ok := mValue.(int64)
 		if !ok {
 			return errors.New("invalid metric value, it is not counter")
@@ -44,12 +45,12 @@ func (m *MemoryStorage) Set(mType string, mKey string, mValue any) error {
 
 func (m *MemoryStorage) Get(mType string, mKey string) (any, error) {
 	switch mType {
-	case repository.MetricTypeGauge:
+	case interfaces.MetricTypeGauge:
 		if _, ok := m.metricsFloat64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}
 		return m.metricsFloat64[mKey], nil
-	case repository.MetricTypeCounter:
+	case interfaces.MetricTypeCounter:
 		if _, ok := m.metricsInt64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}
@@ -57,6 +58,17 @@ func (m *MemoryStorage) Get(mType string, mKey string) (any, error) {
 	default:
 		return nil, errors.New("invalid metric type")
 	}
+}
+
+func (m *MemoryStorage) GetAll() []string {
+	result := []string{}
+	for k, v := range m.metricsFloat64 {
+		result = append(result, fmt.Sprintf("%s: %f", k, v))
+	}
+	for k, v := range m.metricsInt64 {
+		result = append(result, fmt.Sprintf("%s: %d", k, v))
+	}
+	return result
 }
 
 // func (m *MemoryStorage) Delete(type string, key string) {
