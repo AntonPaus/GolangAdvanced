@@ -120,7 +120,7 @@ func (m *Metrics) Report(interval time.Duration, ep string) {
 }
 
 func sendMetricCounter(fieldName string, metric int64, ep string) error {
-	s := fmt.Sprintf("%s/update/counter/%s/%d", ep, fieldName, metric)
+	s := fmt.Sprintf("http://%s/update/counter/%s/%d", ep, fieldName, metric)
 	fmt.Println(s)
 	req, err := http.NewRequest("POST", s, nil)
 	if err != nil {
@@ -143,7 +143,7 @@ func sendMetricCounter(fieldName string, metric int64, ep string) error {
 }
 
 func sendMetricGauge(fieldName string, metric float64, ep string) error {
-	s := fmt.Sprintf("%s/update/gauge/%s/%f", ep, fieldName, metric)
+	s := fmt.Sprintf("http://%s/update/gauge/%s/%f", ep, fieldName, metric)
 	fmt.Println(s)
 	req, err := http.NewRequest("POST", s, nil)
 	if err != nil {

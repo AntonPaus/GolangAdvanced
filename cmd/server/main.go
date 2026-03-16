@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/AntonPaus/GolangAdvanced/internal/config"
 	"github.com/AntonPaus/GolangAdvanced/internal/handler"
 	"github.com/AntonPaus/GolangAdvanced/internal/storage/memory"
 	"github.com/go-chi/chi/v5"
@@ -16,7 +17,7 @@ type App struct {
 	// Logger          *log.Logger
 }
 
-func NewApp() (*App, error) {
+func NewApp(cfg *config.Config) (*App, error) {
 	storage, err := memory.NewMemoryStorage()
 	if err != nil {
 		return nil, fmt.Errorf("cannot initiate storage: %w", err)
@@ -50,7 +51,11 @@ func (a *App) Run() {
 }
 
 func main() {
-	app, err := NewApp()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatalf("Failed load config: %s", err)
+	}
+	app, err := NewApp(cfg)
 	if err != nil {
 		log.Fatalf("Failed run app: %s", err)
 	}
