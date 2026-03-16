@@ -12,7 +12,6 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	StoreInterval   uint   `env:"STORE_INTERVAL"`
 	Restore         bool   `env:"RESTORE"`
-	// flag variables
 }
 
 func NewConfig() (*Config, error) {
