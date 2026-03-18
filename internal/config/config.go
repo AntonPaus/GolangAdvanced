@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	Address         string `env:"ADDRESS"`
+	LogLevel        string `env:"LOG_LEVEL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	StoreInterval   uint   `env:"STORE_INTERVAL"`
 	Restore         bool   `env:"RESTORE"`
@@ -20,12 +21,16 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("config error: %w", err)
 	}
 	address := flag.String("a", "localhost:8080", "server endpoint")
+	logLevel := flag.String("l", "info", "log level")
 	storeInterval := flag.Uint("i", 300, "Store interval")
 	fileStoragePath := flag.String("f", "./storage", "f")
 	restore := flag.Bool("r", false, "restore config")
 	flag.Parse()
 	if cfg.Address == "" {
 		cfg.Address = *address
+	}
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = *logLevel
 	}
 	if cfg.StoreInterval == 0 {
 		cfg.StoreInterval = *storeInterval
@@ -36,5 +41,5 @@ func NewConfig() (*Config, error) {
 	if !cfg.Restore {
 		cfg.Restore = *restore
 	}
-	return &Config{}, nil
+	return cfg, nil
 }
