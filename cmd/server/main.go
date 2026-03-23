@@ -51,9 +51,13 @@ func (a *App) setupRoutes() {
 	a.Router.Use(logger.RequestLogger)
 	a.Router.Get("/", a.Handlers.MainPage)
 	a.Router.Route("/update", func(r chi.Router) {
+		r.Post("/", a.Handlers.UpdateMetricJSON)
 		r.Post("/{type}/{name}/{value}", a.Handlers.UpdateMetric)
 	})
-	a.Router.Get("/value/{type}/{name}", a.Handlers.GetMetric)
+	a.Router.Route("/value", func(r chi.Router) {
+		r.Post("/", a.Handlers.GetMetricJSON)
+		r.Get("/{type}/{name}", a.Handlers.GetMetric)
+	})
 }
 
 func (a *App) Run() {

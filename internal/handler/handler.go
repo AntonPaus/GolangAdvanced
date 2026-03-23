@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -23,11 +24,74 @@ func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	mType, mName := chi.URLParam(r, "type"), chi.URLParam(r, "name")
 	v, err := h.Storage.Get(mType, mName)
 	if err != nil {
-		http.Error(w, "error getting metric", http.StatusNotFound)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf("%v", v)))
+}
+
+func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	var metrics interfaces.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	v, err := h.Storage.Get(metrics.MType, metrics.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	switch metrics.MType {
+	case interfaces.MetricTypeGauge:
+		g, ok := v.(float64)
+		if !ok {
+			http.Error(w, "invalid gauge value", http.StatusInternalServerError)
+			return
+		}
+		metrics.Value = &g
+	case interfaces.MetricTypeCounter:
+		c, ok := v.(int64)
+		if !ok {
+			http.Error(w, "invalid counter value", http.StatusInternalServerError)
+			return
+		}
+		metrics.Delta = &c
+	default:
+		http.Error(w, "metric type not found", http.StatusBadRequest)
+		return
+	}
+	body, err := json.Marshal(metrics)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
+}
+
+func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	var metrics interfaces.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	switch metrics.MType {
+	case interfaces.MetricTypeGauge:
+		if err := h.Storage.Set(metrics.MType, metrics.ID, *metrics.Value); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	case interfaces.MetricTypeCounter:
+		if err := h.Storage.Set(metrics.MType, metrics.ID, *metrics.Delta); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	default:
+		http.Error(w, "metric type not found", http.StatusBadRequest)
+		return
+	}
 }
 
 func (h *Handler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
