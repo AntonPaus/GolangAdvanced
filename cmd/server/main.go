@@ -30,7 +30,7 @@ func NewApp() (*App, error) {
 	}
 	logger.Log.Info("Logger loaded")
 
-	storage, err := memory.NewMemoryStorage()
+	storage, err := memory.NewMemoryStorage(cfg.Restore, cfg.FileStoragePath, cfg.StoreInterval)
 	if err != nil {
 		return nil, fmt.Errorf("cannot initiate storage: %w", err)
 	}

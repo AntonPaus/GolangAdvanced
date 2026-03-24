@@ -24,7 +24,7 @@ func NewConfig() (*Config, error) {
 	logLevel := flag.String("l", "info", "log level")
 	storeInterval := flag.Uint("i", 300, "Store interval")
 	fileStoragePath := flag.String("f", "./storage", "f")
-	restore := flag.Bool("r", false, "restore config")
+	restore := flag.Bool("r", true, "restore config")
 	flag.Parse()
 	if cfg.Address == "" {
 		cfg.Address = *address
