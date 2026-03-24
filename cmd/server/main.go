@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/AntonPaus/GolangAdvanced/internal/compression"
 	"github.com/AntonPaus/GolangAdvanced/internal/config"
 	"github.com/AntonPaus/GolangAdvanced/internal/handler"
 	"github.com/AntonPaus/GolangAdvanced/internal/logger"
@@ -49,6 +50,7 @@ func NewApp() (*App, error) {
 
 func (a *App) setupRoutes() {
 	a.Router.Use(logger.RequestLogger)
+	a.Router.Use(compression.UncompressHandler)
 	a.Router.Get("/", a.Handlers.MainPage)
 	a.Router.Route("/update", func(r chi.Router) {
 		r.Post("/", a.Handlers.UpdateMetricJSON)

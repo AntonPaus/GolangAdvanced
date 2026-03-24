@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AntonPaus/GolangAdvanced/internal/compression"
 	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
 	"github.com/go-chi/chi/v5"
 )
@@ -16,8 +17,19 @@ type Handler struct {
 }
 
 func (h *Handler) MainPage(w http.ResponseWriter, r *http.Request) {
+	body := []byte(strings.Join(h.Storage.GetAll(), "\n"))
+	err := error(nil)
+	if r.Header.Get("Accept-Encoding") == "gzip" {
+		body, err = compression.CompressGzip(body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+	}
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(strings.Join(h.Storage.GetAll(), "\n")))
+	w.Write(body)
 }
 
 func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
@@ -27,8 +39,18 @@ func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	body := []byte(fmt.Sprintf("%v", v))
+	if r.Header.Get("Accept-Encoding") == "gzip" {
+		body, err = compression.CompressGzip(body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+	}
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("%v", v)))
+	w.Write(body)
 }
 
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +87,14 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if r.Header.Get("Accept-Encoding") == "gzip" {
+		body, err = compression.CompressGzip(body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Encoding", "gzip")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

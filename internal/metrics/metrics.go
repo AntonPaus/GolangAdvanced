@@ -1,12 +1,17 @@
 package metrics
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"reflect"
 	"runtime"
 	"time"
+
+	"github.com/AntonPaus/GolangAdvanced/internal/compression"
+	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
 )
 
 type Metrics struct {
@@ -96,16 +101,23 @@ func (m *Metrics) Report(interval time.Duration, ep string) {
 		for i := range statsType.NumField() {
 			value := statsValue.Field(i)
 			fieldName := statsType.Field(i).Name
+			metrics := interfaces.Metrics{
+				ID: fieldName,
+			}
 			switch value.Kind() {
 			case reflect.Int64:
 				c = int64(value.Int())
-				if err := sendMetricCounter(fieldName, c, ep); err != nil {
+				metrics.MType = interfaces.MetricTypeCounter
+				metrics.Delta = &c
+				if err := sendMetricJSON(ep, metrics); err != nil {
 					fmt.Println("Error sending HTTP request:", err)
 					errFound = true
 				}
 			case reflect.Float64:
 				g = float64(value.Float())
-				if err := sendMetricGauge(fieldName, g, ep); err != nil {
+				metrics.MType = interfaces.MetricTypeGauge
+				metrics.Value = &g
+				if err := sendMetricJSON(ep, metrics); err != nil {
 					fmt.Println("Error sending HTTP request:", err)
 					errFound = true
 				}
@@ -149,6 +161,38 @@ func sendMetricGauge(fieldName string, metric float64, ep string) error {
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making HTTP request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP request failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func sendMetricJSON(ep string, metrics interfaces.Metrics) error {
+	s := fmt.Sprintf("http://%s/update/", ep)
+	jsonData, err := json.Marshal(metrics)
+	if err != nil {
+		return fmt.Errorf("error marshalling metrics: %w", err)
+	}
+	compressedData, err := compression.CompressGzip(jsonData)
+	if err != nil {
+		fmt.Printf("Compression error: %v\nSkipping...\n", err)
+	}
+	req, err := http.NewRequest("POST", s, bytes.NewBuffer(compressedData))
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
