@@ -54,7 +54,10 @@ jobs:
 
       - name: Setup go deps
         run: |
-          go install golang.org/x/tools/cmd/goimports@latest
+          # `@latest` can move to an `x/tools` release that requires a newer Go
+          # toolchain than the `golang:1.24` container used by this workflow.
+          # v0.42.0 is compatible with Go 1.24.
+          go install golang.org/x/tools/cmd/goimports@v0.42.0
 
 
       - name: Build server binary
