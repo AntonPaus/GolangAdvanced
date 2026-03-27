@@ -1,4 +1,4 @@
-package memory
+package file
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestMemoryStorage_Get(t *testing.T) {
-	storage, err := NewMemoryStorage()
+	storage, err := NewFileStorage(true, "test.json", 1)
 	require.NoError(t, err)
 	t.Run("Gauge", func(t *testing.T) {
 		err := storage.Set(interfaces.MetricTypeGauge, "g1", 3.1)

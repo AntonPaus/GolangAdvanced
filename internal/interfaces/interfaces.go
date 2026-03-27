@@ -5,10 +5,12 @@ const (
 	MetricTypeCounter = "counter"
 )
 
-type MetricsStorage interface {
+type Storage interface {
 	Set(mType string, mKey string, mValue any) error
 	Get(mType string, mKey string) (any, error)
 	GetAll() []string
+	Ping() error
+	Close() error
 }
 
 type Metrics struct {

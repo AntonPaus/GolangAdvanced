@@ -13,7 +13,7 @@ import (
 )
 
 type Handler struct {
-	Storage interfaces.MetricsStorage
+	Storage interfaces.Storage
 }
 
 func (h *Handler) MainPage(w http.ResponseWriter, r *http.Request) {
