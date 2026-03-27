@@ -2,6 +2,7 @@ package file
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,7 +45,7 @@ func NewFileStorage(restore bool, fileStoragePath string, dumpInterval uint) (*F
 	return s, nil
 }
 
-func (s *FileStorage) Set(mType string, mKey string, mValue any) error {
+func (s *FileStorage) Set(_ context.Context, mType string, mKey string, mValue any) error {
 	// s.mu.Lock()
 	// defer s.mu.Unlock()
 	switch mType {
@@ -69,7 +70,7 @@ func (s *FileStorage) Set(mType string, mKey string, mValue any) error {
 	return nil
 }
 
-func (s *FileStorage) Get(mType string, mKey string) (any, error) {
+func (s *FileStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
 	switch mType {
 	case interfaces.MetricTypeGauge:
 		if _, ok := s.metricsFloat64[mKey]; !ok {
@@ -86,7 +87,7 @@ func (s *FileStorage) Get(mType string, mKey string) (any, error) {
 	}
 }
 
-func (s *FileStorage) GetAll() []string {
+func (s *FileStorage) GetAll(_ context.Context) []string {
 	result := []string{}
 	for k, v := range s.metricsFloat64 {
 		result = append(result, fmt.Sprintf("%s: %f", k, v))

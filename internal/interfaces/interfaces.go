@@ -1,14 +1,16 @@
 package interfaces
 
+import "context"
+
 const (
 	MetricTypeGauge   = "gauge"
 	MetricTypeCounter = "counter"
 )
 
 type Storage interface {
-	Set(mType string, mKey string, mValue any) error
-	Get(mType string, mKey string) (any, error)
-	GetAll() []string
+	Set(ctx context.Context, mType string, mKey string, mValue any) error
+	Get(ctx context.Context, mType string, mKey string) (any, error)
+	GetAll(ctx context.Context) []string
 	Ping() error
 	Close() error
 }

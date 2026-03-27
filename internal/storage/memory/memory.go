@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -21,7 +22,7 @@ func NewMemoryStorage() (*MemoryStorage, error) {
 	return m, nil
 }
 
-func (m *MemoryStorage) Set(mType string, mKey string, mValue any) error {
+func (m *MemoryStorage) Set(_ context.Context, mType string, mKey string, mValue any) error {
 	// m.mu.Lock()
 	// defer m.mu.Unlock()
 	switch mType {
@@ -46,7 +47,7 @@ func (m *MemoryStorage) Set(mType string, mKey string, mValue any) error {
 	return nil
 }
 
-func (m *MemoryStorage) Get(mType string, mKey string) (any, error) {
+func (m *MemoryStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
 	switch mType {
 	case interfaces.MetricTypeGauge:
 		if _, ok := m.metricsFloat64[mKey]; !ok {
@@ -63,7 +64,7 @@ func (m *MemoryStorage) Get(mType string, mKey string) (any, error) {
 	}
 }
 
-func (m *MemoryStorage) GetAll() []string {
+func (m *MemoryStorage) GetAll(_ context.Context) []string {
 	result := []string{}
 	for k, v := range m.metricsFloat64 {
 		result = append(result, fmt.Sprintf("%s: %f", k, v))
