@@ -8,11 +8,11 @@ import (
 	"github.com/AntonPaus/GolangAdvanced/internal/compression"
 	"github.com/AntonPaus/GolangAdvanced/internal/config"
 	"github.com/AntonPaus/GolangAdvanced/internal/handler"
-	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
 	"github.com/AntonPaus/GolangAdvanced/internal/logger"
-	"github.com/AntonPaus/GolangAdvanced/internal/storage/db"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage"
 	"github.com/AntonPaus/GolangAdvanced/internal/storage/file"
 	"github.com/AntonPaus/GolangAdvanced/internal/storage/memory"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage/pg"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
@@ -37,15 +37,20 @@ func NewApp() (*App, error) {
 	logger.Log.Info("Logger loaded")
 
 	// Initialize storage
-	var storage interfaces.Storage
+	var storage storage.Storage
 	if cfg.DatabaseDsn != "" {
 		logger.Log.Info("Database DSN: ", zap.String("dsn", cfg.DatabaseDsn))
-		storage, err = db.NewDBStorage(cfg.DatabaseDsn)
+		dbStorage, err := pg.NewStorage(cfg.DatabaseDsn)
 		if err != nil {
 			logger.Log.Panic("cannot initiate database", zap.Error(err))
 			return nil, fmt.Errorf("cannot initiate database: %w", err)
 		}
+		if err := dbStorage.Bootstrap(); err != nil {
+			logger.Log.Panic("cannot bootstrap database", zap.Error(err))
+			return nil, fmt.Errorf("cannot bootstrap database: %w", err)
+		}
 		logger.Log.Info("Storage DB initialized")
+		storage = dbStorage
 	} else if cfg.FileStoragePath != "" {
 		storage, err = file.NewFileStorage(cfg.Restore, cfg.FileStoragePath, cfg.StoreInterval)
 		if err != nil {
@@ -80,9 +85,10 @@ func (a *App) setupRoutes() {
 	a.Router.Get("/", a.Handlers.MainPage)
 	a.Router.Get("/ping", a.Handlers.Ping)
 	a.Router.Route("/update", func(r chi.Router) {
-		r.Post("/", a.Handlers.UpdateMetricJSON)
+		r.Post("/", a.Handlers.UpdateMetric)
 		r.Post("/{type}/{name}/{value}", a.Handlers.UpdateMetric)
 	})
+	a.Router.Post("/updates/", a.Handlers.Updates)
 	a.Router.Route("/value", func(r chi.Router) {
 		r.Post("/", a.Handlers.GetMetricJSON)
 		r.Get("/{type}/{name}", a.Handlers.GetMetric)

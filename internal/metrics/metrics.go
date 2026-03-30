@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/AntonPaus/GolangAdvanced/internal/compression"
-	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
+	"github.com/AntonPaus/GolangAdvanced/internal/model"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage"
 )
 
 type Metrics struct {
@@ -101,13 +102,13 @@ func (m *Metrics) Report(interval time.Duration, ep string) {
 		for i := range statsType.NumField() {
 			value := statsValue.Field(i)
 			fieldName := statsType.Field(i).Name
-			metrics := interfaces.Metrics{
+			metrics := storage.Metrics{
 				ID: fieldName,
 			}
 			switch value.Kind() {
 			case reflect.Int64:
 				c = int64(value.Int())
-				metrics.MType = interfaces.MetricTypeCounter
+				metrics.MType = model.MetricTypeCounter
 				metrics.Delta = &c
 				if err := sendMetricJSON(ep, metrics); err != nil {
 					fmt.Println("Error sending HTTP request:", err)
@@ -115,7 +116,7 @@ func (m *Metrics) Report(interval time.Duration, ep string) {
 				}
 			case reflect.Float64:
 				g = float64(value.Float())
-				metrics.MType = interfaces.MetricTypeGauge
+				metrics.MType = model.MetricTypeGauge
 				metrics.Value = &g
 				if err := sendMetricJSON(ep, metrics); err != nil {
 					fmt.Println("Error sending HTTP request:", err)
@@ -177,7 +178,7 @@ func sendMetricGauge(fieldName string, metric float64, ep string) error {
 	return nil
 }
 
-func sendMetricJSON(ep string, metrics interfaces.Metrics) error {
+func sendMetricJSON(ep string, metrics storage.Metrics) error {
 	s := fmt.Sprintf("http://%s/update/", ep)
 	jsonData, err := json.Marshal(metrics)
 	if err != nil {

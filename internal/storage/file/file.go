@@ -9,7 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
+	"github.com/AntonPaus/GolangAdvanced/internal/model"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage"
 )
 
 type FileStorage struct {
@@ -45,39 +46,33 @@ func NewFileStorage(restore bool, fileStoragePath string, dumpInterval uint) (*F
 	return s, nil
 }
 
-func (s *FileStorage) Set(_ context.Context, mType string, mKey string, mValue any) error {
+func (s *FileStorage) Set(_ context.Context, metrics []storage.Metrics) error {
 	// s.mu.Lock()
 	// defer s.mu.Unlock()
-	switch mType {
-	case interfaces.MetricTypeGauge:
-		g, ok := mValue.(float64)
-		if !ok {
-			return errors.New("invalid metric value, it is not gauge")
+	for _, m := range metrics {
+		switch m.MType {
+		case model.MetricTypeGauge:
+			s.metricsFloat64[m.ID] = *m.Value
+		case model.MetricTypeCounter:
+			if _, ok := s.metricsInt64[m.ID]; !ok {
+				s.metricsInt64[m.ID] = 0
+			}
+			s.metricsInt64[m.ID] += *m.Delta
+		default:
+			return errors.New("invalid metric type")
 		}
-		s.metricsFloat64[mKey] = g
-	case interfaces.MetricTypeCounter:
-		c, ok := mValue.(int64)
-		if !ok {
-			return errors.New("invalid metric value, it is not counter")
-		}
-		if _, ok := s.metricsInt64[mKey]; !ok {
-			s.metricsInt64[mKey] = 0
-		}
-		s.metricsInt64[mKey] += c
-	default:
-		return errors.New("invalid metric type")
 	}
 	return nil
 }
 
 func (s *FileStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
 	switch mType {
-	case interfaces.MetricTypeGauge:
+	case model.MetricTypeGauge:
 		if _, ok := s.metricsFloat64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}
 		return s.metricsFloat64[mKey], nil
-	case interfaces.MetricTypeCounter:
+	case model.MetricTypeCounter:
 		if _, ok := s.metricsInt64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}

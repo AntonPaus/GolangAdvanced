@@ -138,7 +138,7 @@ package handler
 // 	require.NoError(t, err)
 // 	require.Equal(t, http.StatusOK, secondResult.StatusCode)
 
-// 	value, err := storage.Get(interfaces.MetricTypeCounter, "c1")
+// 	value, err := storage.Get(model.MetricTypeCounter, "c1")
 // 	require.NoError(t, err)
 // 	assert.Equal(t, int64(7), value)
 // }

@@ -10,12 +10,15 @@ import (
 	"time"
 
 	"github.com/AntonPaus/GolangAdvanced/internal/compression"
-	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
+	"github.com/AntonPaus/GolangAdvanced/internal/logger"
+	"github.com/AntonPaus/GolangAdvanced/internal/model"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
-	Storage interfaces.Storage
+	Storage storage.Storage
 }
 
 func (h *Handler) MainPage(w http.ResponseWriter, r *http.Request) {
@@ -60,27 +63,27 @@ func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	var metrics interfaces.Metrics
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	var metrics storage.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
 	v, err := h.Storage.Get(ctx, metrics.MType, metrics.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	switch metrics.MType {
-	case interfaces.MetricTypeGauge:
+	case model.MetricTypeGauge:
 		g, ok := v.(float64)
 		if !ok {
 			http.Error(w, "invalid gauge value", http.StatusInternalServerError)
 			return
 		}
 		metrics.Value = &g
-	case interfaces.MetricTypeCounter:
+	case model.MetricTypeCounter:
 		c, ok := v.(int64)
 		if !ok {
 			http.Error(w, "invalid counter value", http.StatusInternalServerError)
@@ -109,69 +112,51 @@ func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-func (h *Handler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
-	var metrics interfaces.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-	switch metrics.MType {
-	case interfaces.MetricTypeGauge:
-		if err := h.Storage.Set(ctx, metrics.MType, metrics.ID, *metrics.Value); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	case interfaces.MetricTypeCounter:
-		if err := h.Storage.Set(ctx, metrics.MType, metrics.ID, *metrics.Delta); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	default:
-		http.Error(w, "metric type not found", http.StatusBadRequest)
-		return
-	}
-}
-
 func (h *Handler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
-	mType, mName, mValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
-	if err := r.ParseForm(); err != nil {
-		w.Write([]byte(err.Error()))
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
-	switch mType {
-	case interfaces.MetricTypeGauge:
-		value, err := strconv.ParseFloat(mValue, 64)
-		if err != nil {
-			http.Error(w, "invalid gauge value", http.StatusBadRequest)
-			return
-		}
-		if err := h.Storage.Set(ctx, mType, mName, value); err != nil {
-			http.Error(w, "error setting gauge metric", http.StatusBadRequest)
-			return
-		}
-	case interfaces.MetricTypeCounter:
-		value, err := strconv.ParseInt(mValue, 10, 64)
-		if err != nil {
-			http.Error(w, "invalid counter value", http.StatusBadRequest)
-			return
-		}
-		if err := h.Storage.Set(ctx, mType, mName, value); err != nil {
-			http.Error(w, "failed to save counter metric", http.StatusBadRequest)
+	var metrics storage.Metrics
+	switch r.Header.Get("Content-Type") {
+	case "application/json":
+		if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+			logger.Log.Error("error decoding json", zap.Error(err))
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	default:
-		http.Error(w, "metric type not found", http.StatusBadRequest)
-		return
+		if err := r.ParseForm(); err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
+		mType, mName, mValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
+		metrics.MType = mType
+		metrics.ID = mName
+		switch mType {
+		case model.MetricTypeGauge:
+			value, err := strconv.ParseFloat(mValue, 64)
+			if err != nil {
+				logger.Log.Error("invalid gauge value", zap.Error(err))
+				http.Error(w, "invalid gauge value", http.StatusBadRequest)
+				return
+			}
+			metrics.Value = &value
+		case model.MetricTypeCounter:
+			delta, err := strconv.ParseInt(mValue, 10, 64)
+			if err != nil {
+				logger.Log.Error("invalid counter value", zap.Error(err))
+				http.Error(w, "invalid counter value", http.StatusBadRequest)
+				return
+			}
+			metrics.Delta = &delta
+		default:
+			http.Error(w, "metric type not found", http.StatusBadRequest)
+			return
+		}
 	}
-	v, err := h.Storage.Get(ctx, mType, mName)
-	if err != nil {
-		http.Error(w, "error getting metric", http.StatusBadRequest)
+	if err := h.Storage.Set(ctx, []storage.Metrics{metrics}); err != nil {
+		logger.Log.Error("error setting metric", zap.Error(err))
+		http.Error(w, "error setting metric", http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("metric updated: %v\n", v)))
 }

@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/AntonPaus/GolangAdvanced/internal/interfaces"
+	"github.com/AntonPaus/GolangAdvanced/internal/model"
+	"github.com/AntonPaus/GolangAdvanced/internal/storage"
 )
 
 type MemoryStorage struct {
@@ -22,63 +23,57 @@ func NewMemoryStorage() (*MemoryStorage, error) {
 	return m, nil
 }
 
-func (m *MemoryStorage) Set(_ context.Context, mType string, mKey string, mValue any) error {
+func (s *MemoryStorage) Set(_ context.Context, metrics []storage.Metrics) error {
 	// m.mu.Lock()
 	// defer m.mu.Unlock()
-	switch mType {
-	case interfaces.MetricTypeGauge:
-		g, ok := mValue.(float64)
-		if !ok {
-			return errors.New("invalid metric value, it is not gauge")
+	for _, m := range metrics {
+		switch m.MType {
+		case model.MetricTypeGauge:
+			s.metricsFloat64[m.ID] = *m.Value
+		case model.MetricTypeCounter:
+			if _, ok := s.metricsInt64[m.ID]; !ok {
+				s.metricsInt64[m.ID] = 0
+			}
+			s.metricsInt64[m.ID] += *m.Delta
+		default:
+			return errors.New("invalid metric type")
 		}
-		m.metricsFloat64[mKey] = g
-	case interfaces.MetricTypeCounter:
-		c, ok := mValue.(int64)
-		if !ok {
-			return errors.New("invalid metric value, it is not counter")
-		}
-		if _, ok := m.metricsInt64[mKey]; !ok {
-			m.metricsInt64[mKey] = 0
-		}
-		m.metricsInt64[mKey] += c
-	default:
-		return errors.New("invalid metric type")
 	}
 	return nil
 }
 
-func (m *MemoryStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
+func (s *MemoryStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
 	switch mType {
-	case interfaces.MetricTypeGauge:
-		if _, ok := m.metricsFloat64[mKey]; !ok {
+	case model.MetricTypeGauge:
+		if _, ok := s.metricsFloat64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}
-		return m.metricsFloat64[mKey], nil
-	case interfaces.MetricTypeCounter:
-		if _, ok := m.metricsInt64[mKey]; !ok {
+		return s.metricsFloat64[mKey], nil
+	case model.MetricTypeCounter:
+		if _, ok := s.metricsInt64[mKey]; !ok {
 			return nil, errors.New("metric not found")
 		}
-		return m.metricsInt64[mKey], nil
+		return s.metricsInt64[mKey], nil
 	default:
 		return nil, errors.New("invalid metric type")
 	}
 }
 
-func (m *MemoryStorage) GetAll(_ context.Context) []string {
+func (s *MemoryStorage) GetAll(_ context.Context) []string {
 	result := []string{}
-	for k, v := range m.metricsFloat64 {
+	for k, v := range s.metricsFloat64 {
 		result = append(result, fmt.Sprintf("%s: %f", k, v))
 	}
-	for k, v := range m.metricsInt64 {
+	for k, v := range s.metricsInt64 {
 		result = append(result, fmt.Sprintf("%s: %d", k, v))
 	}
 	return result
 }
 
-func (m *MemoryStorage) Ping() error {
+func (s *MemoryStorage) Ping() error {
 	return nil
 }
 
-func (m *MemoryStorage) Close() error {
+func (s *MemoryStorage) Close() error {
 	return nil
 }
