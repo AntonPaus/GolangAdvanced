@@ -65,18 +65,18 @@ func (s *FileStorage) Set(_ context.Context, metrics []storage.Metrics) error {
 	return nil
 }
 
-func (s *FileStorage) Get(_ context.Context, mType string, mKey string) (any, error) {
-	switch mType {
+func (s *FileStorage) Get(_ context.Context, m storage.Metrics) (any, error) {
+	switch m.MType {
 	case model.MetricTypeGauge:
-		if _, ok := s.metricsFloat64[mKey]; !ok {
+		if _, ok := s.metricsFloat64[m.ID]; !ok {
 			return nil, errors.New("metric not found")
 		}
-		return s.metricsFloat64[mKey], nil
+		return s.metricsFloat64[m.ID], nil
 	case model.MetricTypeCounter:
-		if _, ok := s.metricsInt64[mKey]; !ok {
+		if _, ok := s.metricsInt64[m.ID]; !ok {
 			return nil, errors.New("metric not found")
 		}
-		return s.metricsInt64[mKey], nil
+		return s.metricsInt64[m.ID], nil
 	default:
 		return nil, errors.New("invalid metric type")
 	}

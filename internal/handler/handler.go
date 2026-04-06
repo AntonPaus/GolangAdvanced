@@ -42,75 +42,126 @@ func (h *Handler) MainPage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
-	mType, mName := chi.URLParam(r, "type"), chi.URLParam(r, "name")
-	v, err := h.Storage.Get(ctx, mType, mName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	body := []byte(fmt.Sprintf("%v", v))
-	if r.Header.Get("Accept-Encoding") == "gzip" {
-		body, err = compression.CompressGzip(body)
+	var m storage.Metrics
+	fmt.Println("r.Header.Get(\"Content-Type\")", r.Header.Get("Content-Type"))
+	switch r.Header.Get("Content-Type") {
+	case "application/json":
+		if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Println("m", m)
+		v, err := h.Storage.Get(ctx, m)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		switch m.MType {
+		case model.MetricTypeGauge:
+			g, ok := v.(float64)
+			if !ok {
+				http.Error(w, "invalid gauge value", http.StatusInternalServerError)
+				return
+			}
+			m.Value = &g
+		case model.MetricTypeCounter:
+			c, ok := v.(int64)
+			if !ok {
+				http.Error(w, "invalid counter value", http.StatusInternalServerError)
+				return
+			}
+			m.Delta = &c
+		default:
+			http.Error(w, "metric type not found", http.StatusBadRequest)
+			return
+		}
+		body, err := json.Marshal(m)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Encoding", "gzip")
+		if r.Header.Get("Accept-Encoding") == "gzip" {
+			body, err = compression.CompressGzip(body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Encoding", "gzip")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
+	default:
+		m.MType, m.ID = chi.URLParam(r, "type"), chi.URLParam(r, "name")
+		v, err := h.Storage.Get(ctx, m)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		body := []byte(fmt.Sprintf("%v", v))
+		if r.Header.Get("Accept-Encoding") == "gzip" {
+			body, err = compression.CompressGzip(body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Encoding", "gzip")
+		}
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
 	}
-	w.Header().Set("Content-Type", "text/html")
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
 }
 
-func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-	var metrics storage.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	v, err := h.Storage.Get(ctx, metrics.MType, metrics.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	switch metrics.MType {
-	case model.MetricTypeGauge:
-		g, ok := v.(float64)
-		if !ok {
-			http.Error(w, "invalid gauge value", http.StatusInternalServerError)
-			return
-		}
-		metrics.Value = &g
-	case model.MetricTypeCounter:
-		c, ok := v.(int64)
-		if !ok {
-			http.Error(w, "invalid counter value", http.StatusInternalServerError)
-			return
-		}
-		metrics.Delta = &c
-	default:
-		http.Error(w, "metric type not found", http.StatusBadRequest)
-		return
-	}
-	body, err := json.Marshal(metrics)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if r.Header.Get("Accept-Encoding") == "gzip" {
-		body, err = compression.CompressGzip(body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Encoding", "gzip")
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
-}
+// func (h *Handler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+// 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+// 	defer cancel()
+// 	var metrics []storage.Metrics = make([]storage.Metrics, 1)
+// 	if err := json.NewDecoder(r.Body).Decode(&metrics[0]); err != nil {
+// 		http.Error(w, err.Error(), http.StatusBadRequest)
+// 		return
+// 	}
+// 	v, err := h.Storage.Get(ctx, metrics)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), http.StatusNotFound)
+// 		return
+// 	}
+// 	switch metrics[0].MType {
+// 	case model.MetricTypeGauge:
+// 		g, ok := v.(float64)
+// 		if !ok {
+// 			http.Error(w, "invalid gauge value", http.StatusInternalServerError)
+// 			return
+// 		}
+// 		metrics[0].Value = &g
+// 	case model.MetricTypeCounter:
+// 		c, ok := v.(int64)
+// 		if !ok {
+// 			http.Error(w, "invalid counter value", http.StatusInternalServerError)
+// 			return
+// 		}
+// 		metrics[0].Delta = &c
+// 	default:
+// 		http.Error(w, "metric type not found", http.StatusBadRequest)
+// 		return
+// 	}
+// 	body, err := json.Marshal(metrics)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+// 	if r.Header.Get("Accept-Encoding") == "gzip" {
+// 		body, err = compression.CompressGzip(body)
+// 		if err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+// 		w.Header().Set("Content-Encoding", "gzip")
+// 	}
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write(body)
+// }
 
 func (h *Handler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)

@@ -114,11 +114,12 @@ func (s *Storage) Set(ctx context.Context, metrics []storage.Metrics) error {
 	return tx.Commit()
 }
 
-func (s *Storage) Get(ctx context.Context, mType string, mKey string) (any, error) {
-	switch mType {
+func (s *Storage) Get(ctx context.Context, m storage.Metrics) (any, error) {
+	fmt.Println("Get", m)
+	switch m.MType {
 	case model.MetricTypeGauge:
 		var v float64
-		err := s.conn.QueryRowContext(ctx, "SELECT value FROM gauges WHERE id = $1", mKey).Scan(&v)
+		err := s.conn.QueryRowContext(ctx, "SELECT value FROM gauges WHERE id = $1", m.ID).Scan(&v)
 		if err != nil {
 			logger.Log.Error("cannot get gauge", zap.Error(err))
 			return nil, err
@@ -126,14 +127,14 @@ func (s *Storage) Get(ctx context.Context, mType string, mKey string) (any, erro
 		return v, nil
 	case model.MetricTypeCounter:
 		var v int64
-		err := s.conn.QueryRowContext(ctx, "SELECT value FROM counters WHERE id = $1", mKey).Scan(&v)
+		err := s.conn.QueryRowContext(ctx, "SELECT value FROM counters WHERE id = $1", m.ID).Scan(&v)
 		if err != nil {
 			logger.Log.Error("cannot get gauge", zap.Error(err))
 			return nil, err
 		}
 		return v, nil
 	default:
-		return nil, fmt.Errorf("unknown metric type: %s", mType)
+		return nil, fmt.Errorf("unknown metric type: %s", m.MType)
 	}
 }
 

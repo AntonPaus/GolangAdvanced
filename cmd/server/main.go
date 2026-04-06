@@ -90,7 +90,7 @@ func (a *App) setupRoutes() {
 	})
 	a.Router.Post("/updates/", a.Handlers.Updates)
 	a.Router.Route("/value", func(r chi.Router) {
-		r.Post("/", a.Handlers.GetMetricJSON)
+		r.Post("/", a.Handlers.GetMetric)
 		r.Get("/{type}/{name}", a.Handlers.GetMetric)
 	})
 }

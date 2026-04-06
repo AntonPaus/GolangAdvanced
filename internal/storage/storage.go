@@ -12,7 +12,7 @@ type Metrics struct {
 
 type Storage interface {
 	Set(ctx context.Context, metrics []Metrics) error
-	Get(ctx context.Context, mType string, mKey string) (any, error)
+	Get(ctx context.Context, metrics Metrics) (any, error)
 	GetAll(ctx context.Context) []string
 	Ping() error
 	Close() error
